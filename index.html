@@ -586,9 +586,9 @@ const DECISION_SCENARIOS = [
     desc: `คุณพาบอลจี้เข้าหากรอบเขตโทษ กองหลังคู่แข่งบีบเข้ามาปิดมุม!`,
     choices: [
       { text: `⚽ ปั่นด้วยซ้ายไปที่เสาสอง`, type: 'SHOOT' },
+      { text: `⚽ ซัดขวาตรงเข้ามุมประชิดตัว`, type: 'SHOOT' },
       { text: `👟 หักจ่ายกลับเข้ากลางให้เพื่อนป้อนยิง`, type: 'PASS' },
       { text: `🏃 ดึงล็อกโยกหลบกองหลังอีกจังหวะ`, type: 'DRIBBLE' },
-      { text: `🎯 เปิดบอลข้ามไปเสาไกลให้เพื่อน`, type: 'CROSS' },
       { text: `🔒 ชะลอบอลรอเพื่อนขึ้นมาสนับสนุน`, type: 'SAFE' }
     ]
   },
@@ -597,6 +597,7 @@ const DECISION_SCENARIOS = [
     desc: `ลูกตั้งเตะเปิดเข้ามา บอลทะลักมาเข้าทางปืนของคุณพอดี!`,
     choices: [
       { text: `🚀 หวดสวนทันทีแบบไม่ต้องจับ`, type: 'SHOOT' },
+      { text: `⚽ กระแทกบอลซัดประตูทันที`, type: 'SHOOT' },
       { text: `🎯 แต่งบอลหนึ่งจังหวะแล้วโหม่งชงให้เพื่อน`, type: 'PASS' },
       { text: `🏃 คุมบอลลงก่อนหาจังหวะที่ดีกว่า`, type: 'DRIBBLE' },
       { text: `🔒 เคลียร์บอลออกไปให้ปลอดภัยไว้ก่อน`, type: 'SAFE' }
@@ -607,9 +608,9 @@ const DECISION_SCENARIOS = [
     desc: `เพื่อนร่วมทีมสกัดบอลได้กลางสนามแล้วส่งยาวมาให้คุณวิ่งไล่ตามลำพัง เหลือแค่ผู้รักษาประตู!`,
     choices: [
       { text: `⚽ เปิดจังหวะยิงชิพข้ามมือผู้รักษาประตู`, type: 'SHOOT' },
+      { text: `⚽ ซัดตรงไปมุมล่างก่อนผู้รักษาประตูออกมาปิด`, type: 'SHOOT' },
       { text: `👟 หน่วงจังหวะรอเพื่อนวิ่งสอดแล้วจ่ายทะลุ`, type: 'PASS' },
       { text: `🏃 เร่งสปีดหลบแนวรับที่ไล่ตามมา`, type: 'DRIBBLE' },
-      { text: `🎯 ตัดเข้าเปิดให้เพื่อนที่ตำแหน่งดีกว่า`, type: 'CROSS' },
       { text: `🔒 ชะลอเกมรอเพื่อนขึ้นมาช่วย`, type: 'SAFE' }
     ]
   },
@@ -1188,8 +1189,8 @@ function startLiveMatch() {
 
   if (isPlayerOnField) {
     // ตัวจริง: สุ่มเหตุการณ์ตลอดทั้งเกม (ไม่ผูกขาดนาทีท้าย)
-    const count = 3 + Math.floor(Math.random()*3);
-    decisionMinutes = pickRandomMinutes(5, 85, count, 8);
+    const count = 5 + Math.floor(Math.random()*4);
+    decisionMinutes = pickRandomMinutes(5, 85, count, 7);
   } else {
     // ตัวสำรอง: มีโอกาส 50% ที่จะได้ลงสนาม และ 50% ที่จะนั่งสำรองจนจบเกม
     const willComeOn = Math.random() < 0.50;
@@ -1199,7 +1200,7 @@ function startLiveMatch() {
       warmupMinute = Math.max(2, subTargetMinute - (5 + Math.floor(Math.random()*5)));
       
       // จังหวะเล่นเฉพาะช่วงที่ลงสนาม
-      const count = 1 + Math.floor(Math.random()*2);
+      const count = 2 + Math.floor(Math.random()*3);
       decisionMinutes = pickRandomMinutes(subTargetMinute + 2, 88, count, 6);
     } else {
       // นั่งยาวจนจบเกม
@@ -1270,11 +1271,11 @@ function simulateMinuteEvent(min) {
   let oppRating = currentOpponent ? (currentOpponent.rating || 70) : 70;
 
   // เพิ่มความถี่ประตูของ AI
-  let homeGoalProb = 0.008 + (myTeamOvr - oppRating) * 0.0001;
-  let awayGoalProb = 0.008 + (oppRating - myTeamOvr) * 0.0001;
+  let homeGoalProb = 0.014 + (myTeamOvr - oppRating) * 0.00015;
+  let awayGoalProb = 0.014 + (oppRating - myTeamOvr) * 0.00015;
 
-  homeGoalProb = Math.max(0.003, Math.min(0.015, homeGoalProb));
-  awayGoalProb = Math.max(0.003, Math.min(0.015, awayGoalProb));
+  homeGoalProb = Math.max(0.007, Math.min(0.026, homeGoalProb));
+  awayGoalProb = Math.max(0.007, Math.min(0.026, awayGoalProb));
 
   if (rand < homeGoalProb && homeScore < 5) {
     homeScore++;
@@ -1320,7 +1321,13 @@ function makeChoice(actionType) {
   const card = document.getElementById('matchLiveCard');
   box.classList.add('hidden');
 
-  const successRate = actionType === 'SAFE' ? 0.85 : (actionType === 'SHOOT' ? 0.5 : 0.55);
+  const shootRate = clamp(0.5 + (P.attrs.shooting - 60) * 0.006, 0.45, 0.85);
+  const passRate = clamp(0.6 + (P.attrs.passing - 60) * 0.005, 0.5, 0.9);
+  const dribbleRate = clamp(0.55 + (P.attrs.pace - 60) * 0.005, 0.45, 0.85);
+  const successRate = actionType === 'SAFE' ? 0.85
+    : actionType === 'SHOOT' ? shootRate
+    : (actionType === 'PASS' || actionType === 'CROSS') ? passRate
+    : dribbleRate;
   let success = Math.random() < successRate;
   const SCORE_CAP = 6;
 
@@ -1540,10 +1547,17 @@ function retireCareer() {
 function simulateLeagueRound() {
   leagueTeams.forEach(t => {
     t.p++;
-    let r = Math.random();
-    if (r > 0.5) { t.w++; t.pts += 3; }
-    else if (r > 0.25) { t.d++; t.pts += 1; }
-    else { t.l++; }
+    if (!isCupMatch && P && t.name === P.club) {
+      // ใช้ผลการแข่งขันจริงที่ผู้เล่นลงเล่น แทนการสุ่มผลแยกต่างหาก
+      if (homeScore > awayScore) { t.w++; t.pts += 3; }
+      else if (homeScore === awayScore) { t.d++; t.pts += 1; }
+      else { t.l++; }
+    } else {
+      let r = Math.random();
+      if (r > 0.5) { t.w++; t.pts += 3; }
+      else if (r > 0.25) { t.d++; t.pts += 1; }
+      else { t.l++; }
+    }
   });
   leagueTeams.sort((a, b) => b.pts - a.pts);
 }
