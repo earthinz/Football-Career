@@ -139,7 +139,9 @@ body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; o
 
 .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-/* ================= RESPONSIVE / MOBILE ================= */
+/* SYSTEM LOG BAR IN APP */
+.system-log-bar { background: #070a12; border: 1px solid var(--accent-gold); color: var(--accent-gold); font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
+
 @media (max-width: 768px) {
   html, body { overflow-x: hidden; }
 
@@ -326,6 +328,12 @@ body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; o
     </div>
 
     <div class="view-container">
+      <!-- SYSTEM IN-GAME NOTIFICATION LOG -->
+      <div id="systemLogBar" class="system-log-bar hidden">
+        <span id="systemLogText">📌 ข้อความจากระบบ...</span>
+        <button onclick="hideSystemLog()" style="background:none; border:none; color:var(--accent-gold); cursor:pointer; font-weight:bold;">✕</button>
+      </div>
+
       <!-- HOME TAB -->
       <div id="tab-home" class="view-panel active">
         <div class="card hidden" id="emergencyRestCard" style="border-color: var(--accent-red);">
@@ -386,6 +394,7 @@ body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; o
               <b style="color:var(--accent-gold); font-size:16px;" id="coachTrustText">15 / 100</b>
             </div>
             <button class="btn-red hidden" id="btnRetire" style="margin-top:12px;" onclick="retireCareer()">🛑 ประกาศรีไทร์เลิกเล่นอาชีพ</button>
+            <button class="btn-red" style="margin-top:12px; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red);" onclick="resetGameSave()">🗑️ รีเซ็ตเกม / เริ่มเล่นใหม่</button>
           </div>
         </div>
       </div>
@@ -696,6 +705,104 @@ function isTransferWindowOpen() {
   return (currentWeek >= 1 && currentWeek <= 6) || (currentWeek >= 15 && currentWeek <= 18);
 }
 
+/* ================= SAVE & LOAD SYSTEM ================= */
+const SAVE_KEY = "NEXTGEN_FC_SAVE_DATA_V1";
+
+function saveGameData() {
+  if (!P) return;
+  const saveData = {
+    P: P,
+    currentSeason: currentSeason,
+    currentWeek: currentWeek,
+    hasTrainedThisWeek: hasTrainedThisWeek,
+    hasRestedThisWeek: hasRestedThisWeek,
+    leagueTeams: leagueTeams,
+    agentHired: agentHired,
+    ownedItems: ownedItems,
+    trophiesWon: trophiesWon,
+    cupLog: cupLog,
+    nationalCalled: nationalCalled,
+    nationalCaps: nationalCaps,
+    nationalGoals: nationalGoals,
+    nextNationalMatchWeek: nextNationalMatchWeek
+  };
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+  } catch (e) {
+    console.error("Save failed:", e);
+  }
+}
+
+function loadGameData() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data || !data.P) return false;
+
+    P = data.P;
+    currentSeason = data.currentSeason || 1;
+    currentWeek = data.currentWeek || 1;
+    hasTrainedThisWeek = data.hasTrainedThisWeek || false;
+    hasRestedThisWeek = data.hasRestedThisWeek || false;
+    if (data.leagueTeams) leagueTeams = data.leagueTeams;
+    agentHired = data.agentHired || false;
+    ownedItems = data.ownedItems || [];
+    trophiesWon = data.trophiesWon || [];
+    cupLog = data.cupLog || [];
+    nationalCalled = data.nationalCalled || false;
+    nationalCaps = data.nationalCaps || 0;
+    nationalGoals = data.nationalGoals || 0;
+    nextNationalMatchWeek = data.nextNationalMatchWeek || null;
+
+    if (agentHired) {
+      document.getElementById('agentHireSection').classList.add('hidden');
+      document.getElementById('agentActiveSection').classList.remove('hidden');
+    }
+
+    document.getElementById('creatorScreen').classList.add('hidden');
+    document.getElementById('gameDashboard').classList.remove('hidden');
+
+    updateDashboardUI();
+    prepareNextMatch();
+    renderLeagueTable();
+    renderLifestyleStore();
+    renderTrophies();
+    renderCupBracket();
+
+    showSystemLog("💾 โหลดข้อมูลเซฟเกมสำเร็จ!");
+    return true;
+  } catch (e) {
+    console.error("Load save error:", e);
+    return false;
+  }
+}
+
+function resetGameSave() {
+  if (confirm("⚠️ คุณแน่ใจหรือไม่ที่จะลบไฟล์เซฟเกมเดิมและเริ่มต้นใหม่ทั้งหมด?")) {
+    localStorage.removeItem(SAVE_KEY);
+    location.reload();
+  }
+}
+
+// ระบบแจ้งเตือนในเกมแทนการใช้ alert เครื่อง
+function showSystemLog(msg) {
+  const bar = document.getElementById('systemLogBar');
+  const text = document.getElementById('systemLogText');
+  if (bar && text) {
+    text.textContent = `📢 ${msg}`;
+    bar.classList.remove('hidden');
+    // ออโต้ซ่อนหลังผ่านไป 5 วินาที
+    setTimeout(() => {
+      bar.classList.add('hidden');
+    }, 5000);
+  }
+}
+
+function hideSystemLog() {
+  document.getElementById('systemLogBar').classList.add('hidden');
+}
+
 /* ================= CREATOR SYSTEM ================= */
 function renderAdjusters() {
   document.getElementById('statAdjusters').innerHTML = Object.keys(tempStats).map(key => `
@@ -760,6 +867,8 @@ function initCareer() {
   document.getElementById('creatorScreen').classList.add('hidden');
   document.getElementById('gameDashboard').classList.remove('hidden');
 
+  showSystemLog(`ยินดีต้อนรับ ${P.name} เข้าสู่อาชีพค้าแข้งสังกัด ${P.club}!`);
+  saveGameData();
   updateDashboardUI();
   prepareNextMatch();
   renderLeagueTable();
@@ -837,8 +946,8 @@ function updateDashboardUI() {
 }
 
 function doWeeklyTraining() {
-  if (hasTrainedThisWeek || hasRestedThisWeek) { alert('คุณทำการซ้อมหรือพักผ่อนสัปดาห์นี้ไปแล้ว!'); return; }
-  if (P.fitness < 20) { alert('⚠️ ความฟิตไม่พอซ้อม! กรุณาเลือกพักผ่อน'); return; }
+  if (hasTrainedThisWeek || hasRestedThisWeek) { showSystemLog('คุณทำการซ้อมหรือพักผ่อนสัปดาห์นี้ไปแล้ว!'); return; }
+  if (P.fitness < 20) { showSystemLog('⚠️ ความฟิตไม่พอซ้อม! กรุณาเลือกพักผ่อน'); return; }
 
   P.fitness = Math.max(0, P.fitness - 20);
   hasTrainedThisWeek = true;
@@ -848,24 +957,27 @@ function doWeeklyTraining() {
   let k = keys[Math.floor(Math.random() * keys.length)];
   P.attrs[k] = Math.min(99, P.attrs[k] + 1);
 
-  alert(`💪 การซ้อมเสร็จสิ้น! ได้รับ ${STAT_LABELS[k]} +1 (ความฟิต -20%)`);
+  showSystemLog(`💪 ซ้อมเสร็จสิ้น! ได้รับ ${STAT_LABELS[k]} +1 (ความฟิต -20%)`);
+  saveGameData();
   updateDashboardUI();
   checkMatchReady();
 }
 
 function restPlayer() {
-  if (hasTrainedThisWeek || hasRestedThisWeek) { alert('คุณทำกิจกรรมสัปดาห์นี้ไปแล้ว!'); return; }
+  if (hasTrainedThisWeek || hasRestedThisWeek) { showSystemLog('คุณทำกิจกรรมสัปดาห์นี้ไปแล้ว!'); return; }
 
   P.fitness = Math.min(100, P.fitness + 30);
   hasRestedThisWeek = true;
-  alert('🛌 พักผ่อนเรียบร้อย ความฟิต +30% (สัปดาห์นี้ถือว่าไม่ได้ซ้อม)');
+  showSystemLog('🛌 พักผ่อนเรียบร้อย ความฟิต +30%');
+  saveGameData();
   updateDashboardUI();
   checkMatchReady();
 }
 
 function emergencyRest() {
   P.fitness = 40;
-  alert('🛌 ฟื้นฟูร่างกายฉุกเฉินสำเร็จ ความฟิตเพิ่มเป็น 40%');
+  showSystemLog('🛌 ฟื้นฟูร่างกายฉุกเฉินสำเร็จ ความฟิตเพิ่มเป็น 40%');
+  saveGameData();
   updateDashboardUI();
 }
 
@@ -878,6 +990,7 @@ function hireAgent(name, isFree) {
   document.getElementById('navAgent').classList.remove('hidden');
 
   addAgentMessage(`🤝 สวัสดีครับ! ผมจะดูแลเรื่องข้อเสนอย้ายทีมและผลประโยชน์ของคุณเองครับ!`);
+  saveGameData();
 }
 
 function addAgentMessage(msg) {
@@ -907,7 +1020,7 @@ function triggerAgentTransferOffer() {
 function acceptTransfer() {
   if (!agentOfferPending) return;
   if (!isTransferWindowOpen()) {
-    alert('❌ ตลาดซื้อขายปิดแล้ว!');
+    showSystemLog('❌ ตลาดซื้อขายปิดแล้ว!');
     document.getElementById('transferOfferBox').classList.add('hidden');
     agentOfferPending = null;
     return;
@@ -917,14 +1030,15 @@ function acceptTransfer() {
   P.wage = isFirstTeam() ? Math.round(P.wage * 1.5) : 8000;
   if (!isFirstTeam()) {
     P.role = "ดาวรุ่งชุดใหญ่";
-    alert(`🎉 ยินดีด้วย! คุณเซ็นสัญญาอาชีพย้ายไปร่วมทีม ${P.club} ในไทยลีก 1 เรียบร้อยแล้ว!`);
+    showSystemLog(`🎉 คุณเซ็นสัญญาอาชีพย้ายไปร่วมทีม ${P.club} ในไทยลีก 1 เรียบร้อยแล้ว!`);
   } else {
-    alert(`🎉 ยินดีด้วย! คุณย้ายไปร่วมทีม ${P.club} เรียบร้อยแล้ว!`);
+    showSystemLog(`🎉 คุณย้ายไปร่วมทีม ${P.club} เรียบร้อยแล้ว!`);
   }
 
   document.getElementById('transferOfferBox').classList.add('hidden');
   addAgentMessage(`ยินดีด้วยกับการย้ายทีมไป ${P.club}! ทำผลงานให้เต็มที่นะ!`);
   agentOfferPending = null;
+  saveGameData();
   updateDashboardUI();
   prepareNextMatch();
 }
@@ -954,10 +1068,11 @@ function renderLifestyleStore() {
 }
 
 function buyLifestyle(id, price) {
-  if (P.bankBalance < price) { alert('❌ เงินสะสมในบัญชีของคุณไม่พอ!'); return; }
+  if (P.bankBalance < price) { showSystemLog('❌ เงินสะสมในบัญชีของคุณไม่พอ!'); return; }
   P.bankBalance -= price;
   ownedItems.push(id);
-  alert('🎉 สั่งซื้อสำเร็จแล้ว!');
+  showSystemLog('🎉 สั่งซื้อสินค้าไลฟ์สไตล์สำเร็จ!');
+  saveGameData();
   updateDashboardUI();
   renderLifestyleStore();
 }
@@ -1067,25 +1182,29 @@ function startLiveMatch() {
     isPlayerOnField = false;
   }
 
-  // ---- ตารางเหตุการณ์ประจำนัดนี้: กำหนดล่วงหน้าตั้งแต่เป่านกหวีด ----
+  // ---- ตารางเหตุการณ์ประจำนัดนี้ ----
   subTargetMinute = null; warmupMinute = null; decisionMinutes = [];
   matchScenarioQueue = shuffleArr(DECISION_SCENARIOS);
 
   if (isPlayerOnField) {
-    // ตัวจริงเล่นเต็มเกม (ถ้าไม่โดนเปลี่ยนออก) -> สุ่ม 4-5 จังหวะตัดสินใจกระจายทั้งเกม
-    const count = 4 + Math.floor(Math.random()*2);
-    decisionMinutes = pickRandomMinutes(6, 87, count, 8);
+    // ตัวจริง: สุ่มเหตุการณ์ตลอดทั้งเกม (ไม่ผูกขาดนาทีท้าย)
+    const count = 3 + Math.floor(Math.random()*3);
+    decisionMinutes = pickRandomMinutes(5, 85, count, 8);
   } else {
-    // ตัวสำรอง: คละเวลาที่ถูกเรียกลงจริง ไม่ผูกกับช่วง 50+ เสมอไป
-    const willComeOn = Math.random() < 0.82;
+    // ตัวสำรอง: มีโอกาส 50% ที่จะได้ลงสนาม และ 50% ที่จะนั่งสำรองจนจบเกม
+    const willComeOn = Math.random() < 0.50;
     if (willComeOn) {
-      const subPool = [50,55,60,65,70,75,80,85,90];
+      const subPool = [45, 55, 60, 68, 75, 80];
       subTargetMinute = subPool[Math.floor(Math.random()*subPool.length)];
-      warmupMinute = Math.max(2, subTargetMinute - (3 + Math.floor(Math.random()*5)));
-      if (subTargetMinute <= 84) {
-        const count = 1 + Math.floor(Math.random()*2);
-        decisionMinutes = pickRandomMinutes(subTargetMinute+2, 89, count, 6);
-      }
+      warmupMinute = Math.max(2, subTargetMinute - (5 + Math.floor(Math.random()*5)));
+      
+      // จังหวะเล่นเฉพาะช่วงที่ลงสนาม
+      const count = 1 + Math.floor(Math.random()*2);
+      decisionMinutes = pickRandomMinutes(subTargetMinute + 2, 88, count, 6);
+    } else {
+      // นั่งยาวจนจบเกม
+      subTargetMinute = null;
+      warmupMinute = null;
     }
   }
 
@@ -1099,8 +1218,7 @@ function startLiveMatch() {
     addMatchLog(`0'`, `🪑 คุณมีชื่อเป็นตัวสำรอง นั่งรอโอกาสข้างสนาม`, 'log');
   }
 
-  // ปรับความเร็วลูปให้กระชับขึ้น
-  matchTimer = setInterval(runMatchLoop, 380);
+  matchTimer = setInterval(runMatchLoop, 300);
 }
 
 function runMatchLoop() {
@@ -1110,15 +1228,17 @@ function runMatchLoop() {
 
   if (isPlayerOnField) matchMinutesPlayed++;
 
+  // โค้ชสั่งวอร์ม
   if (!isPlayerOnField && !isPlayerWarmingUp && warmupMinute && currentMinute >= warmupMinute) {
     isPlayerWarmingUp = true;
     addMatchLog(`${currentMinute}'`, `🔥 โค้ชสั่งให้คุณลุกไปวอร์มร่างกายข้างสนาม!`, 'sub');
   }
 
+  // โค้ชเปลี่ยนตัวลง
   if (!isPlayerOnField && isPlayerWarmingUp && subTargetMinute && currentMinute >= subTargetMinute) {
     isPlayerOnField = true;
     P.stats.apps++;
-    addMatchLog(`${currentMinute}'`, `🔄 เปลี่ยนตัวลงสนาม! โค้ชส่งคุณลงทำเกมในนาทีที่ ${currentMinute}`, 'sub');
+    addMatchLog(`${currentMinute}'`, `🔄 เปลี่ยนตัวลงสนาม! โค้ชส่งคุณลงสนามในนาทีที่ ${currentMinute}`, 'sub');
   }
 
   simulateMinuteEvent(currentMinute);
@@ -1126,6 +1246,11 @@ function runMatchLoop() {
   if (currentMinute >= 90) {
     clearInterval(matchTimer);
     document.getElementById('liveStatusText').textContent = "จบการแข่งขัน FT";
+    
+    if (!isPlayerOnField && subTargetMinute === null) {
+      addMatchLog(`90'`, `🪑 นัดนี้โค้ชไม่ได้ส่งคุณลงสนาม คุณนั่งสำรองจนจบเกม`, 'log');
+    }
+    
     addMatchLog(`90'`, `🔔 กรรมการเป่านกหวีดหมดเวลาการแข่งขัน!`, 'highlight');
     showMatchSummary();
   }
@@ -1139,25 +1264,39 @@ function simulateMinuteEvent(min) {
     return;
   }
 
+  // จำลองจังหวะยิง/จุดโทษ ของ AI เพิ่มโอกาสยิงประตูให้สมจริงไม่จบ 0-0 บ่อย
   let rand = Math.random();
   let myTeamOvr = Math.round((P.attrs.pace + P.attrs.shooting + P.attrs.passing + P.attrs.defending) / 4);
   let oppRating = currentOpponent ? (currentOpponent.rating || 70) : 70;
 
-  let homeGoalProb = 0.0032 + (myTeamOvr - oppRating) * 0.00008;
-  let awayGoalProb = 0.0032 + (oppRating - myTeamOvr) * 0.00008;
+  // เพิ่มความถี่ประตูของ AI
+  let homeGoalProb = 0.008 + (myTeamOvr - oppRating) * 0.0001;
+  let awayGoalProb = 0.008 + (oppRating - myTeamOvr) * 0.0001;
 
-  homeGoalProb = Math.max(0.0012, Math.min(0.007, homeGoalProb));
-  awayGoalProb = Math.max(0.0012, Math.min(0.007, awayGoalProb));
+  homeGoalProb = Math.max(0.003, Math.min(0.015, homeGoalProb));
+  awayGoalProb = Math.max(0.003, Math.min(0.015, awayGoalProb));
 
-  if (rand < homeGoalProb && homeScore < 4) {
+  if (rand < homeGoalProb && homeScore < 5) {
     homeScore++;
     document.getElementById('scoreText').textContent = `${homeScore} - ${awayScore}`;
+    
+    let isPenalty = Math.random() < 0.2;
     const scorer = TEAMMATE_NAMES[Math.floor(Math.random()*TEAMMATE_NAMES.length)];
-    addMatchLog(`${min}'`, `⚽ GOAL! ${scorer} ซัดเข้าไปให้ ${P.club}!`, 'highlight');
-  } else if (rand > (1 - awayGoalProb) && awayScore < 4) {
+    if (isPenalty) {
+      addMatchLog(`${min}'`, `🥅 PENALTY! ${P.club} ได้จุดโทษและ ${scorer} ยิงเข้าไปไม่เหลือ!`, 'highlight');
+    } else {
+      addMatchLog(`${min}'`, `⚽ GOAL! ${scorer} ซัดประตูให้ ${P.club}!`, 'highlight');
+    }
+  } else if (rand > (1 - awayGoalProb) && awayScore < 5) {
     awayScore++;
     document.getElementById('scoreText').textContent = `${homeScore} - ${awayScore}`;
-    addMatchLog(`${min}'`, `🚨 GOAL! ${currentOpponent.name} ได้ประตูนำ`, 'alert');
+    
+    let isPenalty = Math.random() < 0.2;
+    if (isPenalty) {
+      addMatchLog(`${min}'`, `🥅 PENALTY! ${currentOpponent.name} ได้จุดโทษและสังหารเข้าไป!`, 'alert');
+    } else {
+      addMatchLog(`${min}'`, `🚨 GOAL! ${currentOpponent.name} ได้ประตูนำ!`, 'alert');
+    }
   }
 }
 
@@ -1183,7 +1322,7 @@ function makeChoice(actionType) {
 
   const successRate = actionType === 'SAFE' ? 0.85 : (actionType === 'SHOOT' ? 0.5 : 0.55);
   let success = Math.random() < successRate;
-  const SCORE_CAP = 5;
+  const SCORE_CAP = 6;
 
   if (success) {
     card.classList.add('flash-gold');
@@ -1220,7 +1359,7 @@ function makeChoice(actionType) {
     addMatchLog(`${currentMinute}'`, `❌ FAILED! เล่นยากเกินไป โดนแย่งบอลกลับไปเล่น`, 'alert');
   }
 
-  matchTimer = setInterval(runMatchLoop, 380);
+  matchTimer = setInterval(runMatchLoop, 300);
 }
 
 function addMatchLog(min, msg, type = 'log') {
@@ -1243,8 +1382,8 @@ function showMatchSummary() {
     document.getElementById('resSummaryText').textContent = `ลงสนาม ${matchMinutesPlayed} นาที | ยิง ${matchGoals} ประตู | ทำ ${matchAssists} แอสซิสต์`;
   } else {
     document.getElementById('resRating').textContent = "N/A";
-    document.getElementById('resSummaryText').textContent = `คุณไม่ได้ลงสนามในเกมนี้ (ได้พักผ่อนฟื้นฟูความฟิต +10%)`;
-    P.fitness = Math.min(100, P.fitness + 10);
+    document.getElementById('resSummaryText').textContent = `คุณไม่ได้ลงสนามในเกมนี้ (ได้พักผ่อนฟื้นฟูความฟิต +15%)`;
+    P.fitness = Math.min(100, P.fitness + 15);
   }
 
   if (isCupMatch) {
@@ -1254,13 +1393,13 @@ function showMatchSummary() {
     if (won) {
       if (isFinal) {
         let trophyTitle = isFirstTeam() ? "แชมป์ ช้าง เอฟเอ คัพ" : "แชมป์ เยาวชน เอฟเอ คัพ";
-        alert(`🏆 ยินดีด้วย! สโมสรของคุณคว้า ${trophyTitle}!`);
+        showSystemLog(`🏆 ยินดีด้วย! สโมสรของคุณคว้า ${trophyTitle}!`);
         trophiesWon.push({ name: trophyTitle, year: currentSeason });
       } else {
-        alert('🎉 ผ่านเข้ารอบฟุตบอลถ้วยต่อไป!');
+        showSystemLog('🎉 ผ่านเข้ารอบฟุตบอลถ้วยต่อไป!');
       }
     } else {
-      alert('❌ แพ้ในบอลถ้วย ตกรอบ');
+      showSystemLog('❌ แพ้ในบอลถ้วย ตกรอบ');
     }
     renderTrophies();
     renderCupBracket();
@@ -1296,7 +1435,7 @@ function maybeNationalCallup() {
     nationalCalled = true;
     nextNationalMatchWeek = currentWeek + 2 + Math.floor(Math.random()*2);
     document.getElementById('nationalTeamCard').classList.remove('hidden');
-    alert(`🇹🇭 ข่าวดี! ${P.name} ได้รับการเรียกตัวติดทีมชาติไทยชุดใหญ่เป็นครั้งแรก! เตรียมลงเล่นในช่วงฟีฟ่าเดย์ครั้งหน้า`);
+    showSystemLog(`🇹🇭 ข่าวดี! ${P.name} ถูกเรียกติดทีมชาติไทย!`);
   }
 }
 
@@ -1308,9 +1447,9 @@ function simulateNationalMatch() {
   const assisted = !scored && Math.random() < scoreChance*0.8;
   P.coachTrust = Math.min(100, P.coachTrust + 4);
   let msg = `🇹🇭 นัดทีมชาติ: ลงเล่นให้ทีมชาติไทยครบ 90 นาที`;
-  if (scored) { nationalGoals++; msg += ` ยิงประตูได้ 1 ลูก! กระแสตอบรับดีมาก`; }
+  if (scored) { nationalGoals++; msg += ` ยิงประตูได้ 1 ลูก!`; }
   else if (assisted) { msg += ` จ่ายบอลให้เพื่อนทำประตูได้ 1 ครั้ง`; }
-  alert(msg);
+  showSystemLog(msg);
   nextNationalMatchWeek = currentWeek + 6 + Math.floor(Math.random()*5);
   updateDashboardUI();
 }
@@ -1322,21 +1461,21 @@ function finishMatchDay() {
   }
   P.bankBalance += P.wage;
 
-  // ระบบไต่ระดับจากอคาเดมี่ขึ้นชุดใหญ่
+  // ระบบไต่ระดับตำแหน่ง
   if (P.role === "สำรองอคาเดมี่" && P.coachTrust >= 30) {
     P.role = "ตัวจริงเยาวชน";
-    alert('🎉 ผลงานดีเข้าตา! เลื่อนขั้นเป็น "11 ตัวจริงทีมอคาเดมี่ U18"');
+    showSystemLog('🎉 ผลงานดีเข้าตา! เลื่อนขั้นเป็น "11 ตัวจริงทีมอคาเดมี่ U18"');
   } else if (P.role === "ตัวจริงเยาวชน" && P.coachTrust >= 60) {
     P.role = "ดาวรุ่งชุดใหญ่";
     P.wage = 10000;
-    alert('🚀 โอกาสใหญ่มาถึง! โค้ชดันคุณขึ้น "ทีมชุดใหญ่ (ไทยลีก 1)" เรียบร้อยแล้ว! (ได้รับสัญญาอาชีพเพิ่มค่าเหนื่อยเป็น ฿10,000)');
+    showSystemLog('🚀 โค้ชดันคุณขึ้น "ทีมชุดใหญ่ (ไทยลีก 1)" เรียบร้อยแล้ว!');
   } else if (P.role === "ดาวรุ่งชุดใหญ่" && P.coachTrust >= 80) {
     P.role = "ตัวจริง";
     P.wage = 25000;
-    alert('🎉 ยึดตำแหน่งสำเร็จ! เลื่อนขั้นเป็น "11 ตัวจริงชุดใหญ่ ในไทยลีก 1"');
+    showSystemLog('🎉 เลื่อนขั้นเป็น "11 ตัวจริงชุดใหญ่ ในไทยลีก 1"');
   } else if (P.role === "ตัวจริง" && P.coachTrust >= 95) {
     P.role = "กัปตันทีม";
-    alert('🌟 แต่งตั้ง! ได้รับสวมปลอกแขนเป็น "กัปตันทีมชุดใหญ่"');
+    showSystemLog('🌟 ได้รับแต่งตั้งสวมปลอกแขนเป็น "กัปตันทีมชุดใหญ่"');
   }
 
   if (agentHired && isTransferWindowOpen() && Math.random() < 0.35) {
@@ -1361,6 +1500,7 @@ function finishMatchDay() {
   document.getElementById('liveStreamArea').classList.add('hidden');
   document.getElementById('matchPreNotice').classList.remove('hidden');
 
+  saveGameData();
   updateDashboardUI();
   prepareNextMatch();
   renderLeagueTable();
@@ -1371,11 +1511,11 @@ function advanceSeason() {
   currentWeek = 1;
   P.age++;
 
-  alert(`📅 จบฤดูกาล! เข้าสู่ปีที่ ${currentSeason} (อายุ ${P.age} ปี)`);
+  showSystemLog(`📅 จบฤดูกาล! เข้าสู่ปีที่ ${currentSeason} (อายุ ${P.age} ปี)`);
 
   if (leagueTeams[0].name === P.club) {
     let tName = isFirstTeam() ? "แชมป์ ฟุตบอลไทยลีก 1" : "แชมป์ ไทย Youth League (U18)";
-    alert(`🏆 ยินดีด้วย! สโมสร ${P.club} คว้า ${tName} ประจำฤดูกาล!`);
+    showSystemLog(`🏆 ยินดีด้วย! สโมสร ${P.club} คว้า ${tName}!`);
     trophiesWon.push({ name: tName, year: currentSeason - 1 });
     renderTrophies();
   }
@@ -1383,18 +1523,18 @@ function advanceSeason() {
   if (P.age >= 33) {
     P.attrs.pace = Math.max(30, P.attrs.pace - 2);
     P.fitness = Math.max(50, P.fitness - 5);
-    alert('⚠️ สภาพร่างกายโรยราตามอายุ (ความเร็วและความฟิตลดลง)');
+    showSystemLog('⚠️ สภาพร่างกายโรยราตามอายุ (ความเร็วและความฟิตลดลง)');
   }
 
   if (P.age >= 50) {
-    alert('🛑 อายุครบ 50 ปี ปิดฉากอาชีพค้าแข้งอย่างยิ่งใหญ่!');
     retireCareer();
   }
 }
 
 function retireCareer() {
-  alert(`🏁 ปิดฉากอาชีพค้าแข้งของ ${P.name}!\nสถิติรวม: ลงเล่น ${P.stats.apps} นัด | ทำ ${P.stats.goals} ประตู | ทำ ${P.stats.assists} แอสซิสต์`);
-  location.reload();
+  showSystemLog(`🏁 ปิดฉากอาชีพค้าแข้งของ ${P.name}! สถิติรวม: ลงเล่น ${P.stats.apps} นัด | ยิง ${P.stats.goals} ประตู`);
+  localStorage.removeItem(SAVE_KEY);
+  setTimeout(() => { location.reload(); }, 3000);
 }
 
 function simulateLeagueRound() {
@@ -1429,6 +1569,12 @@ function switchTab(tabId, el) {
     document.getElementById('agentNotify').classList.add('hidden');
   }
 }
+
+// ตรวจสอบข้อมูลเซฟเมื่อเปิดหน้าเว็บ
+window.addEventListener('DOMContentLoaded', () => {
+  loadGameData();
+});
 </script>
 </body>
 </html>
+    
